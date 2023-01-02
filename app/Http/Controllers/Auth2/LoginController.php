@@ -43,8 +43,15 @@ class LoginController extends Controller
           User::where('id',auth()->user()->id)->update(['google2fa_secret_enable'=>1]);
           return redirect('/chat/2');
       }else{
+          User::where('id',auth()->user()->id)->update(['google2fa_secret_enable'=>0]);
           Auth::logout();
           return redirect('/login2');
       }
+    }
+
+    public function logout()
+    {
+        Auth::logout();
+        return redirect('/login2');
     }
 }

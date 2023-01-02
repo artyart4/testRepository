@@ -14,6 +14,6 @@ class ChatsResource extends JsonResource
      */
     public function toArray($request)
     {
-        return ['id'=>$this->id, 'message'=>$this->message, 'recipient_id'=>$this->recipient_id,'sender_id'=>$this->sender_id,'recipient_name'=>$this->recipient->name, 'sender_name'=>$this->sender->name, 'file'=>$this->file];
+        return parent::toArray($request);
     }
 }

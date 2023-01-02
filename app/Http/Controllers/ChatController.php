@@ -3,37 +3,50 @@
 namespace App\Http\Controllers;
 
 use App\Events\MessageEvent;
+use App\Http\Middleware\TwoFaCheck;
 use App\Http\Resources\ChatsCollection;
 use App\Jobs\SendFile;
+use App\Models\Chat;
 use App\Models\Message;
 use App\Notifications\TelegramNotification;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 
 class ChatController extends Controller
 {
-    public function chats()
-    {
-       $chats =  Message::where('recipient_id',auth()->user()->id)->orWhere('sender_id',auth()->user()->id)->select('id','recipient_id','sender_id','message')->with('recipient')->with('sender')->get();
-       return new ChatsCollection($chats);
-    }
 
-    public function index($id)
+
+    public function index()
     {
-        return view('chat.chats');
+        $myChats = Chat::where('user_1',auth()->user()->id)->orWhere('user_2',auth()->user()->id)->with('sender')->with('recipient')->with('lastMessage')->get();
+        return view('chat.chats', compact('myChats'));
     }
 
     public function get($id)
     {
-        $messages =  Message::where('recipient_id',auth()->user()->id)->where('sender_id',$id)->orWhere('sender_id',auth()->user()->id)->where('recipient_id',$id)->select('id','recipient_id','sender_id','message','file')->with('recipient')->with('sender')->get();
-        return new ChatsCollection($messages);
+        if (Gate::check('avaliable_message',$id)){
+            $chat_id =Chat::where('user_1',$id)->where('user_2',auth()->user()->id)->orWhere('user_1',auth()->user()->id)->where('user_2',$id)->value('id');
+            $messages = Message::where('chat_id',$chat_id)->get();
+
+            return $messages;
+        }else{
+            return \Illuminate\Auth\Access\Response::deny('вы не можете писать пользователю, который не добавил вас', 403);
+        }
+
     }
 
-    public function send(Request $request)
+    public function send(Request $request,  $chat_id)
     {
-        $message = $request->validate(['message'=>'required','file'=>'']);
-       $message= Message::create(['sender_id'=>auth()->user()->id, 'recipient_id'=>request()->route('id'), 'message'=>$message['message'], 'file'=>$message['file']]);
+        $message = $request->validate(['message'=>'required']);
+//        $message_crypt = Crypt::encryptString($request->input('message'));
+       $message= Message::create(['sender_id'=>auth()->user()->id, 'recipient_id'=>request()->route('id'), 'message'=>$request->input('message'),'chat_id'=>1]);
+
+
         broadcast(new MessageEvent($message)) ;
     }
 
@@ -42,7 +55,7 @@ class ChatController extends Controller
         $file_path = $request->file('file')->store('public_files','public');
         $file_name = $request->file('file')->getFilename().$request->file('file')->getMimeType();
         $file_name = str_replace('/','.', $file_name);
-        $res =   Message::create(['sender_id'=>auth()->user()->id, 'recipient_id'=>request()->route('id'), 'file'=>$file_name]);
+        $res =   Message::create(['sender_id'=>auth()->user()->id, 'recipient_id'=>request()->route('id'), 'file'=>$file_name, 'message'=>$request->input('message'),'chat_id'=>1]);
 
          dispatch(new SendFile($file_path));
        return redirect()->back();
@@ -51,4 +64,5 @@ public function downloadFile($file)
 {
     return Storage::download('/public/public_files/',$file);
 }
+
 }
