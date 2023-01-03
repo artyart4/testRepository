@@ -8,7 +8,7 @@
         <input type="submit" value="оплатить">
     </form>
 
-
+<p>тест</p>
     <h2> Баланс</h2>
     <div> @if(cache()->has('balance')) {{cache()->get('balance')}}$ @else 0$ @endif </div>
 @endsection
